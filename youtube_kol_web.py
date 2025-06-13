@@ -3,9 +3,23 @@ import pandas as pd
 from googleapiclient.discovery import build
 import os
 import io
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 API_KEY = 'AIzaSyBbL3HZF1RAUlhQ1hxdfqG2UDokPqjPnyE'
 CHECKED_FILE = "checked_channels.txt"
+
+# Google Sheets 认证
+scope = [
+    'https://spreadsheets.google.com/feeds',
+    'https://www.googleapis.com/auth/drive'
+]
+creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+gs_client = gspread.authorize(creds)
+
+# 打开表格（用表格名或URL都可以）
+SHEET_NAME = 'Youtuber Pool'
+sheet = gs_client.open(SHEET_NAME).sheet1
 
 st.title("Youtuber Finder")
 
@@ -120,6 +134,23 @@ if run:
         df = df[(df['播放量'] >= min_views) & (df['播放量'] <= max_views)]
         st.write(f"共找到 {len(df)} 个独立频道")
         st.dataframe(df)
+        # 写入Google Sheets（去重）
+        # 1. 读取现有频道链接
+        existing_links = set()
+        try:
+            existing_rows = sheet.get_all_records()
+            for row in existing_rows:
+                if '频道链接' in row:
+                    existing_links.add(row['频道链接'])
+        except Exception as e:
+            st.write(f"读取Google Sheet时出错: {e}")
+        # 2. 只写入新频道
+        new_rows = [row for row in df.values.tolist() if row[df.columns.get_loc('频道链接')] not in existing_links]
+        # 3. 只写一次表头
+        if sheet.row_count == 0 or sheet.cell(1, 1).value != df.columns[0]:
+            sheet.append_row(df.columns.tolist())
+        for row in new_rows:
+            sheet.append_row(row)
         csv = df.to_csv(index=False, encoding='utf-8-sig')
         st.download_button(
             label="下载结果为CSV",
