@@ -66,7 +66,7 @@ def get_channel_info(youtube, channel_id):
     return {
         '频道名': item['snippet']['title'],
         '频道链接': f"https://www.youtube.com/channel/{channel_id}",
-        '订阅数': item['statistics'].get('subscriberCount', 'N/A'),
+        '订阅量/Subscribe': item['statistics'].get('subscriberCount', 'N/A'),
         '邮箱/关于页': f"https://www.youtube.com/channel/{channel_id}/about"
     }
 
@@ -106,15 +106,16 @@ if run:
         data.append(channel_info)
     save_checked_channels(new_channels)
     if data:
+        st.write(f'原始采集频道数: {len(data)}')
         df = pd.DataFrame(data)
-        # 只保留订阅数为数字的行
-        df = df[df['订阅数'].apply(lambda x: str(x).isdigit())]
-        df['订阅数'] = df['订阅数'].astype(int)
+        # 只保留订阅量为数字的行
+        df = df[df['订阅量/Subscribe'].apply(lambda x: str(x).isdigit())]
+        df['订阅量/Subscribe'] = df['订阅量/Subscribe'].astype(int)
         # 只保留播放量为数字的行
         df = df[df['播放量'].apply(lambda x: str(x).isdigit())]
         df['播放量'] = df['播放量'].astype(int)
-        # 按订阅数区间过滤
-        df = df[(df['订阅数'] >= min_subs) & (df['订阅数'] <= max_subs)]
+        # 按订阅量区间过滤
+        df = df[(df['订阅量/Subscribe'] >= min_subs) & (df['订阅量/Subscribe'] <= max_subs)]
         # 按播放量区间过滤
         df = df[(df['播放量'] >= min_views) & (df['播放量'] <= max_views)]
         st.write(f"共找到 {len(df)} 个独立频道")
