@@ -13,6 +13,8 @@ query = st.text_input("请输入关键词（如：数字货币交易、crypto tr
 max_results = st.number_input("最多查找视频数", min_value=1, max_value=200, value=200)
 min_subs = st.number_input("最小订阅数", min_value=0, value=0)
 max_subs = st.number_input("最大订阅数", min_value=0, value=100000000)
+min_views = st.number_input("最小播放量", min_value=0, value=0)
+max_views = st.number_input("最大播放量", min_value=0, value=1000000000)
 run = st.button("开始查找")
 
 def load_checked_channels():
@@ -68,14 +70,17 @@ def get_channel_info(youtube, channel_id):
         '邮箱/关于页': f"https://www.youtube.com/channel/{channel_id}/about"
     }
 
-def get_video_comment_count(youtube, video_id):
+def get_video_comment_count_and_views(youtube, video_id):
     response = youtube.videos().list(
         part='statistics',
         id=video_id
     ).execute()
     if not response['items']:
-        return 0
-    return response['items'][0]['statistics'].get('commentCount', 0)
+        return 0, 0
+    stats = response['items'][0]['statistics']
+    comment_count = stats.get('commentCount', 0)
+    view_count = stats.get('viewCount', 0)
+    return comment_count, view_count
 
 if run:
     st.write("正在查找，请稍候...")
@@ -94,8 +99,10 @@ if run:
         channel_info = get_channel_info(youtube, channel_id)
         if not channel_info:
             continue
-        comment_count = get_video_comment_count(youtube, video['video_id'])
+        comment_count, view_count = get_video_comment_count_and_views(youtube, video['video_id'])
         channel_info['评论数'] = comment_count
+        channel_info['视频评论数'] = comment_count
+        channel_info['播放量'] = view_count
         data.append(channel_info)
     save_checked_channels(new_channels)
     if data:
@@ -103,8 +110,13 @@ if run:
         # 只保留订阅数为数字的行
         df = df[df['订阅数'].apply(lambda x: str(x).isdigit())]
         df['订阅数'] = df['订阅数'].astype(int)
+        # 只保留播放量为数字的行
+        df = df[df['播放量'].apply(lambda x: str(x).isdigit())]
+        df['播放量'] = df['播放量'].astype(int)
         # 按订阅数区间过滤
         df = df[(df['订阅数'] >= min_subs) & (df['订阅数'] <= max_subs)]
+        # 按播放量区间过滤
+        df = df[(df['播放量'] >= min_views) & (df['播放量'] <= max_views)]
         st.write(f"共找到 {len(df)} 个独立频道")
         st.dataframe(df)
         csv = df.to_csv(index=False, encoding='utf-8-sig')
